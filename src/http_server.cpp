@@ -18,7 +18,6 @@ static uv_loop_t *loop;
 static uv_tcp_t tcpServer;
 static milo::Parser *parser;
 struct sockaddr_in address;
-Napi::Function cb;
 
 struct milo_response
 {
@@ -26,6 +25,11 @@ struct milo_response
     char *method;
     std::vector<std::string> header_values;
     std::vector<std::string> header_names;
+};
+
+struct ConnectionData
+{
+    Napi::FunctionReference cb;
 };
 
 static intptr_t on_method(const milo::Parser *p, uintptr_t position, uintptr_t size)
@@ -78,17 +82,29 @@ static void after_read(uv_stream_t *handle,
 
     milo::milo_parse(parser, (const unsigned char *)buf->base, nread);
 
-    printf("Method:%s\n", res->method);
+    ConnectionData *connectionData = static_cast<ConnectionData *>(tcpServer.data);
+    Napi::Env env = connectionData->cb.Env();
 
-    for (const auto &str : res->header_names)
+    Napi::Object responseObj = Napi::Object::New(connectionData->cb.Env());
+    responseObj.Set("method", Napi::String::New(connectionData->cb.Env(), res->method));
+
+    Napi::Array headerNamesArray = Napi::Array::New(connectionData->cb.Env(), res->header_names.size());
+    for (size_t i = 0; i < res->header_names.size(); i++)
     {
-        printf("Header name: %s\n", str.c_str());
+        headerNamesArray.Set(i, Napi::String::New(connectionData->cb.Env(), res->header_names[i]));
     }
 
-    for (const auto &str : res->header_values)
+    responseObj.Set("header_names", headerNamesArray);
+
+    Napi::Array headerValuesArray = Napi::Array::New(connectionData->cb.Env(), res->header_values.size());
+    for (size_t i = 0; i < res->header_values.size(); i++)
     {
-        printf("Header value: %s\n", str.c_str());
+        headerValuesArray.Set(i, Napi::String::New(connectionData->cb.Env(), res->header_values[i]));
     }
+
+    responseObj.Set("header_values", headerValuesArray);
+
+    connectionData->cb.Call(connectionData->cb.Env().Global(), {responseObj});
 
     free(res);
 }
@@ -138,18 +154,19 @@ Napi::Value MiloHttpServer::Listen(const Napi::CallbackInfo &info)
     }
 
     uint port = info[0].As<Napi::Number>().DoubleValue();
-    cb = info[1].As<Napi::Function>();
 
     loop = uv_default_loop();
-    // parser = milo::milo_create();
+    parser = milo::milo_create();
     uv_tcp_init(loop, &tcpServer);
     printf("Starting on %s:%d\n", HOST, port);
     uv_ip4_addr(HOST, port, &address);
     uv_tcp_bind(&tcpServer, (const struct sockaddr *)&address, 0);
-    // uv_listen((uv_stream_t *)&tcpServer, BACKLOG, on_connection);
-    uv_run(loop, UV_RUN_DEFAULT);
 
-    cb.Call(env.Global(), {Napi::String::New(env, "hello world")});
+    ConnectionData *connectionData = new ConnectionData{Napi::Persistent(info[1].As<Napi::Function>())};
+    tcpServer.data = connectionData;
+
+    uv_listen((uv_stream_t *)&tcpServer, BACKLOG, on_connection);
+    uv_run(loop, UV_RUN_DEFAULT);
 }
 
 Napi::Function MiloHttpServer::GetClass(Napi::Env env)
