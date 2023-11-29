@@ -1,9 +1,12 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <vector>
+#include <napi.h>
+
 #include "uv.h"
 #include "assert.h"
 #include "milo.h"
-#include <vector>
+#include "http_server.h"
 
 // The backlog argument defines the maximum length to which the
 // queue of pending connections for sockfd may grow.  If a
@@ -16,6 +19,8 @@
 static uv_loop_t *loop;
 static uv_tcp_t tcpServer;
 static milo::Parser *parser;
+struct sockaddr_in address;
+Napi::Function cb;
 
 struct milo_response
 {
@@ -116,15 +121,52 @@ static void on_connection(uv_stream_t *server, int status)
     uv_read_start((uv_stream_t *)client, allocator, after_read);
 }
 
-int main()
+MiloHttpServer::MiloHttpServer(const Napi::CallbackInfo &info)
+    : ObjectWrap(info)
 {
-    struct sockaddr_in address;
-    loop = uv_default_loop();
-    parser = milo::milo_create();
-    uv_tcp_init(loop, &tcpServer);
-    printf("Starting on %s:%d\n", HOST, PORT);
-    uv_ip4_addr(HOST, PORT, &address);
-    uv_tcp_bind(&tcpServer, (const struct sockaddr *)&address, 0);
-    uv_listen((uv_stream_t *)&tcpServer, BACKLOG, on_connection);
-    uv_run(loop, UV_RUN_DEFAULT);
+    // loop = uv_default_loop();
+    // parser = milo::milo_create();
+    // uv_tcp_init(loop, &tcpServer);
 }
+
+Napi::Value MiloHttpServer::Listen(const Napi::CallbackInfo &info)
+{
+    Napi::Env env = info.Env();
+
+    if (info.Length() < 2)
+    {
+        Napi::TypeError::New(env, "Wrong number of arguments")
+            .ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    double port = info[0].As<Napi::Number>().DoubleValue();
+    cb = info[1].As<Napi::Function>();
+
+    // printf("Starting on %s:%d\n", HOST, PORT);
+    // uv_ip4_addr(HOST, port, &address);
+    // uv_tcp_bind(&tcpServer, (const struct sockaddr *)&address, 0);
+    // uv_listen((uv_stream_t *)&tcpServer, BACKLOG, on_connection);
+    // uv_run(loop, UV_RUN_DEFAULT);
+
+    cb.Call(env.Global(), {Napi::String::New(env, "hello world")});
+}
+
+Napi::Function MiloHttpServer::GetClass(Napi::Env env)
+{
+    return DefineClass(
+        env,
+        "MiloHttpServer",
+        {
+            MiloHttpServer::InstanceMethod("listen", &MiloHttpServer::Listen),
+        });
+}
+
+Napi::Object Init(Napi::Env env, Napi::Object exports)
+{
+    Napi::String name = Napi::String::New(env, "MiloHttpServer");
+    exports.Set(name, MiloHttpServer::GetClass(env));
+    return exports;
+}
+
+NODE_API_MODULE(addon, Init)
