@@ -15,7 +15,7 @@
             "<!(node -p \"require('node-addon-api').gyp\")",
             "deps/uv/uv.gyp:libuv"
         ],
-        'libraries': ['-Ideps/milo/parser/dist/cpp/release-all-callbacks/libmilo.a'],
+        'libraries': ['../deps/milo/parser/dist/cpp/release-all-callbacks/libmilo.a'],
         'defines': [ 'NAPI_DISABLE_CPP_EXCEPTIONS' ],
         'cflags': [ '-stdlib=libc++' ],
     }]

@@ -5,7 +5,7 @@
   "main": "lib/index.js",
   "gypfile": true,
   "scripts": {
-    "build": "node-gyp rebuild",
+    "build": "node-gyp rebuild --verbose",
     "clean": "node-gyp clean",
     "start": "node ./lib/index.js"
   },
