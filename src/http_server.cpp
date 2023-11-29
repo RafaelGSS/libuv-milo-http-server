@@ -25,6 +25,7 @@ struct milo_response
     char *method;
     std::vector<std::string> header_values;
     std::vector<std::string> header_names;
+    char *body;
 };
 
 struct ConnectionData
@@ -61,9 +62,18 @@ static intptr_t on_header_name(const milo::Parser *p, uintptr_t position, uintpt
     return 0;
 };
 
-static void after_read(uv_stream_t *handle,
-                       ssize_t nread,
-                       const uv_buf_t *buf)
+static intptr_t on_data(const milo::Parser *p, uintptr_t position, uintptr_t size)
+{
+    milo_response *res = (milo_response *)p->owner;
+    res->body = reinterpret_cast<char *>(malloc(sizeof(char) * 1000));
+    strncpy(res->body, reinterpret_cast<const char *>(res->base) + position, size);
+    return 0;
+};
+
+static void
+after_read(uv_stream_t *handle,
+           ssize_t nread,
+           const uv_buf_t *buf)
 {
 
     if (nread <= 0)
@@ -79,14 +89,15 @@ static void after_read(uv_stream_t *handle,
     parser->callbacks.on_method = on_method;
     parser->callbacks.on_header_value = on_header_value;
     parser->callbacks.on_header_name = on_header_name;
+    parser->callbacks.on_data = on_data;
 
     milo::milo_parse(parser, (const unsigned char *)buf->base, nread);
 
     ConnectionData *connectionData = static_cast<ConnectionData *>(tcpServer.data);
-    Napi::Env env = connectionData->cb.Env();
 
     Napi::Object responseObj = Napi::Object::New(connectionData->cb.Env());
     responseObj.Set("method", Napi::String::New(connectionData->cb.Env(), res->method));
+    responseObj.Set("body", Napi::String::New(connectionData->cb.Env(), res->body));
 
     Napi::Array headerNamesArray = Napi::Array::New(connectionData->cb.Env(), res->header_names.size());
     for (size_t i = 0; i < res->header_names.size(); i++)
