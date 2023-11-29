@@ -89,6 +89,8 @@ static void after_read(uv_stream_t *handle,
     {
         printf("Header value: %s\n", str.c_str());
     }
+
+    free(res);
 }
 
 // we have to allocate manually all chunks of data we receive
