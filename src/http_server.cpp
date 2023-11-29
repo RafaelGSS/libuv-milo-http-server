@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <vector>
 #include <napi.h>
-
 #include "uv.h"
 #include "assert.h"
 #include "milo.h"
@@ -13,7 +12,6 @@
 // connection request arrives when the queue is full, the client may
 // receive an error with an indication of ECONNREFUSED
 #define BACKLOG 511
-#define PORT 8000
 #define HOST "0.0.0.0"
 
 static uv_loop_t *loop;
