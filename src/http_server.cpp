@@ -124,9 +124,6 @@ static void on_connection(uv_stream_t *server, int status)
 MiloHttpServer::MiloHttpServer(const Napi::CallbackInfo &info)
     : ObjectWrap(info)
 {
-    // loop = uv_default_loop();
-    // parser = milo::milo_create();
-    // uv_tcp_init(loop, &tcpServer);
 }
 
 Napi::Value MiloHttpServer::Listen(const Napi::CallbackInfo &info)
@@ -140,14 +137,17 @@ Napi::Value MiloHttpServer::Listen(const Napi::CallbackInfo &info)
         return env.Null();
     }
 
-    double port = info[0].As<Napi::Number>().DoubleValue();
+    uint port = info[0].As<Napi::Number>().DoubleValue();
     cb = info[1].As<Napi::Function>();
 
-    // printf("Starting on %s:%d\n", HOST, PORT);
-    // uv_ip4_addr(HOST, port, &address);
-    // uv_tcp_bind(&tcpServer, (const struct sockaddr *)&address, 0);
+    loop = uv_default_loop();
+    // parser = milo::milo_create();
+    uv_tcp_init(loop, &tcpServer);
+    printf("Starting on %s:%d\n", HOST, port);
+    uv_ip4_addr(HOST, port, &address);
+    uv_tcp_bind(&tcpServer, (const struct sockaddr *)&address, 0);
     // uv_listen((uv_stream_t *)&tcpServer, BACKLOG, on_connection);
-    // uv_run(loop, UV_RUN_DEFAULT);
+    uv_run(loop, UV_RUN_DEFAULT);
 
     cb.Call(env.Global(), {Napi::String::New(env, "hello world")});
 }
